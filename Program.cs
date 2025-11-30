@@ -52,7 +52,7 @@ public class GameServer : INetEventListener
         Console.WriteLine($"Sala creada: {p1.Address} <--> {p2.Address}");
 
         var writer = new NetDataWriter();
-        writer.Put("{\"start\":1}");
+        writer.Put( "{\"jugador\":0,\"pos_x\":0.0,\"pos_y\":0.0,\"pos_z\":0.0,\"obstaculo\":1}");
 
         p1.Send(writer, DeliveryMethod.ReliableOrdered);
         p2.Send(writer, DeliveryMethod.ReliableOrdered);
