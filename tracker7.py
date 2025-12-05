@@ -146,6 +146,72 @@ class DetectorPostura:
 
 
 # ============================================================================ #
+#                      DETECTOR DE PROXIMIDAD Y POSICIÓN                       #
+# ============================================================================ #
+class DetectorProximidad:
+    """
+    Detecta si el usuario está muy cerca de la cámara o muy a los lados
+    Usa hombros, caderas y rodillas (puntos estables)
+    """
+    def __init__(self, umbral_cercania=0.38, umbral_lateral=0.80, suavizado=5):
+        self.umbral_cercania = umbral_cercania  # Distancia entre hombros normalizada
+        self.umbral_lateral = umbral_lateral    # Posición X normalizada
+        self.buffer_distancia = deque(maxlen=suavizado)
+        self.buffer_posicion_x = deque(maxlen=suavizado)
+        self.buffer_rodillas_y = deque(maxlen=suavizado)
+        
+    def analizar(self, results, frame_width, frame_height):
+        """
+        Analiza proximidad y posición lateral
+        Retorna: velocidad especial (-4, -5, -6) o None
+        """
+        if not results.pose_landmarks:
+            return None, None
+        
+        landmarks = results.pose_landmarks.landmark
+        mp_pose = mp.solutions.pose
+        
+        # Obtener puntos estables
+        hombro_izq = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER]
+        hombro_der = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER]
+        cadera_izq = landmarks[mp_pose.PoseLandmark.LEFT_HIP]
+        cadera_der = landmarks[mp_pose.PoseLandmark.RIGHT_HIP]
+        rodilla_izq = landmarks[mp_pose.PoseLandmark.LEFT_KNEE]
+        rodilla_der = landmarks[mp_pose.PoseLandmark.RIGHT_KNEE]
+        
+        # 1. PROXIMIDAD: Usar posición Y de rodillas (si están muy abajo = muy cerca)
+        rodillas_y = (rodilla_izq.y + rodilla_der.y) / 2
+        self.buffer_rodillas_y.append(rodillas_y)
+        rodillas_promedio = np.mean(self.buffer_rodillas_y)
+        
+        # 2. POSICIÓN LATERAL: centro de masa del cuerpo
+        centro_x = (hombro_izq.x + hombro_der.x + cadera_izq.x + cadera_der.x) / 4
+        self.buffer_posicion_x.append(centro_x)
+        pos_promedio = np.mean(self.buffer_posicion_x)
+        
+        # 3. DECISIÓN
+        velocidad_especial = None
+        estado = None
+        
+        # Muy cerca (rodillas cerca del borde inferior = 75% de la pantalla)
+        if rodillas_promedio > 0.80:
+            velocidad_especial = -4
+            estado = "MUY CERCA"
+        
+        # Muy a la derecha (centro de masa > 80% del ancho)
+        elif pos_promedio > self.umbral_lateral:
+            velocidad_especial = -5
+            estado = "MUY DERECHA"
+        
+        # Muy a la izquierda (centro de masa < 20% del ancho)
+        elif pos_promedio < (1 - self.umbral_lateral):
+            velocidad_especial = -6
+            estado = "MUY IZQUIERDA"
+        
+        return velocidad_especial, estado
+
+
+# ============================================================================ #
 #                         TRACKER PRINCIPAL DEL JUEGO                          #
 # ============================================================================ #
 
@@ -167,6 +233,7 @@ pose = mp_pose.Pose(
 # --- CARGAR MODELO ---
 print("Cargando modelo de postura...")
 detector = DetectorPostura('modelo_exportado/modelo_postura.pkl', ventana=13)
+detector_proximidad = DetectorProximidad(umbral_cercania=0.38, umbral_lateral=0.80, suavizado=5)
 print("✓ Modelo de postura cargado correctamente.")
 
 # --- VARIABLES GLOBALES ---
@@ -221,10 +288,11 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
 prev_time = time.time()
 print("\n" + "=" * 60)
-print("TRACKER MEJORADO - Predicción cada 30 frames (1 segundo)")
+print("TRACKER MEJORADO - Con detección de proximidad")
 print("=" * 60)
 print("Presiona ESC para salir\n")
-ttt=False
+ttt = False
+
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
@@ -244,6 +312,24 @@ while cap.isOpened():
         mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
         hands = checkHandsJoined(frame, results)
 
+        # ========== DETECCIÓN DE PROXIMIDAD (INDEPENDIENTE) ==========
+        vel_especial, estado_proximidad = detector_proximidad.analizar(results, w, h)
+        
+        if vel_especial is not None:
+            # Enviar alerta de proximidad (MISMO FORMATO EXACTO)
+            data_prox = {
+                "poscarril": "centro",
+                "poshorizontal": "standing",
+                "velocidad": vel_especial
+            }
+            sock.sendto(json.dumps(data_prox).encode(), (UDP_IP, UDP_PORT))
+            
+            # Mostrar alerta visual
+            color_alerta = (0, 0, 255) if vel_especial == -4 else (255, 0, 255)
+            cv2.putText(frame, f"ALERTA: {estado_proximidad}", (w//2 - 150, 50), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.2, color_alerta, 3)
+        # ==============================================================
+
         now = time.time()
         if hands == "Hands Joined" and (now - last_toggle_time > cooldown):
             if not empezo:
@@ -254,10 +340,10 @@ while cap.isOpened():
                
                 print("[INIT] Tracking iniciado")
             else:
-                ttt=True
+                ttt = True
                 empezo = False
                 linea_hombros = None
-                velocidad  = -3
+                velocidad = -3
                 print("[RESET] Tracking reiniciado")
             last_toggle_time = now
 
@@ -294,7 +380,7 @@ while cap.isOpened():
 
             cv2.line(frame, (0, int(linea_hombros)), (w, int(linea_hombros)), (0, 255, 0), 3)
 
-
+            # Enviar datos normales de juego
             data = {"poscarril": poscarril, "poshorizontal": poshorizontal, "velocidad": velocidad}
             sock.sendto(json.dumps(data).encode(), (UDP_IP, UDP_PORT))
 
@@ -305,7 +391,7 @@ while cap.isOpened():
     color = (0, 255, 0) if hands == "Hands Joined" else (0, 0, 255)
     
     cv2.putText(frame, f"HandsJoined: {hands}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
-    cv2.putText(frame, f"Buffer: {detector.frame_count % 13}/25", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+    cv2.putText(frame, f"Buffer: {detector.frame_count % 13}/13", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
     cv2.putText(frame, f"{poshorizontal}", (10, h - 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
     cv2.putText(frame, f"{poscarril}", (10, h - 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
     cv2.putText(frame, f"Velocidad: {velocidad} ({display_clase})", (w - 500, h - 80),
@@ -313,12 +399,11 @@ while cap.isOpened():
     cv2.putText(frame, f"FPS: {int(fps)}", (w - 150, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
-    # Enviar por UDP
-
-    if (ttt):
+    # Enviar por UDP cuando se resetea
+    if ttt:
         data = {"poscarril": poscarril, "poshorizontal": poshorizontal, "velocidad": velocidad}
         sock.sendto(json.dumps(data).encode(), (UDP_IP, UDP_PORT))
-        ttt=False
+        ttt = False
 
     cv2.imshow("bodytracker", frame)
     if cv2.waitKey(1) & 0xFF == 27:
