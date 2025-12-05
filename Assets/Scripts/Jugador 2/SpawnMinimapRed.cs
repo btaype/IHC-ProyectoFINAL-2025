@@ -197,6 +197,11 @@ public class SpawnMinimapRed : MonoBehaviour
             Debug.Log($"🧱 OBJETO COLOCADO → Carril {carril + 1} (X={carrilesX[carril]}, Z={hit.point.z:F1})");
 
             // 🔥 ENVIAR AL SERVIDOR
+            if (GlobalData.forcedConstruction != -1)
+            {
+                GlobalData.forcedConstruction = -1;
+                Debug.Log("COMBO COMPLETADO → Botones liberados");
+            }
             if (client != null)
             {
                 // Determinar el índice del obstáculo (1 o 2)
@@ -366,7 +371,7 @@ public class SpawnMinimapRed : MonoBehaviour
     {
         if (client == null) return;
 
-        if (GlobalData.mancha && numeroJugador==2)
+        if (GlobalData.mancha && numeroJugador == 2)
         {
             EstadoPosicion estado = new EstadoPosicion
             {
@@ -376,7 +381,7 @@ public class SpawnMinimapRed : MonoBehaviour
                 pos_z = 0f,
                 obstaculo = 5
             };
-
+            GlobalData.forcedConstruction = 0;
             string json = JsonUtility.ToJson(estado);
             var writer = new NetDataWriter();
             writer.Put(json);
@@ -386,7 +391,7 @@ public class SpawnMinimapRed : MonoBehaviour
             GlobalData.mancha = false; // opcional: resetear después de enviar
         }
 
-        if (GlobalData.hielo && numeroJugador == 2 && GlobalData.espera==true)
+        if (GlobalData.hielo && numeroJugador == 2 && GlobalData.espera == true)
         {
             GlobalData.espera = false;
             EstadoPosicion estado = new EstadoPosicion
@@ -404,7 +409,7 @@ public class SpawnMinimapRed : MonoBehaviour
             client.Server.Send(writer, DeliveryMethod.Sequenced);
 
             Debug.Log($"📤 Poder Hielo enviado: {json}");
-            
+
         }
     }
 }

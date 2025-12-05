@@ -29,7 +29,7 @@ public class GameTimer : MonoBehaviour
     void Update()
     {
         // No avanza si el juego terminó, no inició, o está en pausa
-        if (juegoTerminado || !GlobalData.inicio || (GlobalData.inicio == true && GlobalData.pausa == true))return;
+        if (juegoTerminado || !GlobalData.inicio2 || (GlobalData.inicio2 == true && GlobalData.pausa == true))return;
 
         // Disminuir el tiempo
         tiempoRestante -= Time.deltaTime;

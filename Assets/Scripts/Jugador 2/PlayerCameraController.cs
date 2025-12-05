@@ -5,53 +5,87 @@ public class MinimapCameraController : MonoBehaviour
     [Header("Movimiento")]
     public float moveSpeed = 10f;
     public float zoomSpeed = 5f;
-    
+
     [Header("LÍMITES")]
-    public Transform player;           // ← Jugador1 (barrera Z)
-    public bool limiteDetrasJugador = true;  // Activa/desactiva barrera
-    
+    public Transform player;
+    public bool limiteDetrasJugador = true;
+
+    [Header("Límite dinámico con zoom")]
+    public float avanceConZoom = 0.7f;
+    // Cuánto avanza la cámara hacia delante por cada unidad de zoom out
+
     [Header("Límites Mundo (opcional)")]
     public bool useWorldBounds = false;
     public Vector2 minWorldBounds = new Vector2(-50, -50);
     public Vector2 maxWorldBounds = new Vector2(50, 50);
 
     private Camera minimapCam;
+    private float lastZoom;
 
     void Start()
     {
         minimapCam = GetComponent<Camera>();
+        lastZoom = minimapCam.orthographicSize;
     }
 
     void Update()
     {
-        // Movimiento flechas
+        // Movimiento normal
         float h = Input.GetAxisRaw("Horizontal");
         float v = Input.GetAxisRaw("Vertical");
         Vector3 movement = new Vector3(h, 0, v) * moveSpeed * Time.deltaTime;
         transform.Translate(movement, Space.World);
 
-        // Zoom rueda mouse
+        // =======================
+        //      Z O O M  
+        // =======================
         if (minimapCam.orthographic)
         {
             float scroll = Input.GetAxis("Mouse ScrollWheel");
-            minimapCam.orthographicSize = Mathf.Clamp(
-                minimapCam.orthographicSize - scroll * zoomSpeed,
-                5f, 50f
-            );
+
+            if (scroll != 0)
+            {
+                float oldSize = minimapCam.orthographicSize;
+
+                minimapCam.orthographicSize = Mathf.Clamp(
+                    minimapCam.orthographicSize - scroll * zoomSpeed,
+                    5f, 50f
+                );
+
+                float newSize = minimapCam.orthographicSize;
+
+                // Si hubo ZOOM OUT → la cámara debe avanzar hacia adelante (Z+)
+                if (newSize > oldSize)
+                {
+                    float deltaZoom = newSize - oldSize;
+
+                    transform.position += new Vector3(
+                        0,
+                        0,
+                        deltaZoom * avanceConZoom
+                    );
+                }
+            }
         }
 
-        // === BARRERA DETRÁS DEL JUGADOR ===
+        // =======================
+        //  BARRERA DETRÁS DEL JUGADOR
+        // =======================
         if (limiteDetrasJugador && player != null)
         {
             Vector3 pos = transform.position;
+
             if (pos.z < player.position.z)
             {
-                pos.z = player.position.z;  // No pasa del jugador
+                pos.z = player.position.z;
             }
+
             transform.position = pos;
         }
 
-        // Límites mundo (opcional)
+        // =======================
+        //     WORLD BOUNDS
+        // =======================
         if (useWorldBounds)
         {
             Vector3 pos = transform.position;

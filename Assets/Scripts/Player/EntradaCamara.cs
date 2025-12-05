@@ -55,6 +55,15 @@ public class EntradaCamara : MonoBehaviour
                     Debug.Log($"📦 Parseado - Carril: {estado.poscarril}, Horizontal: {estado.poshorizontal}, Vel: {estado.velocidad}");
 
                     // 🔹 Encolar movimientos
+                    if ((estado.velocidad == -6 || estado.velocidad == -5 || estado.velocidad == -4))
+                    {
+                        if (GlobalData.error_camara == 0)
+                        {
+                            GlobalData.error_camara = estado.velocidad;
+                            Debug.Log($"❌ Error cámara registrado: {estado.velocidad}");
+                        }
+                        continue; // Salta al siguiente mensaje UDP
+                    }
                     if (!string.IsNullOrEmpty(estado.poscarril))
                     {
                         

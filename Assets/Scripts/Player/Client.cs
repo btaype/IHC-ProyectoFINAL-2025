@@ -5,13 +5,25 @@ using System.Collections;
 
 public class Client : MonoBehaviour, INetEventListener
 {
+    public static Client Instance;
+    void Awake()
+    {
+        if (Instance != null)
+        {
+            Destroy(gameObject); // Evita duplicados
+            return;
+        }
+
+        Instance = this;
+        DontDestroyOnLoad(gameObject); // Mantener un solo cliente
+    }
     private NetManager client;
     private NetPeer server;
     public ReceptorServidor receptorServidor; // Arrastrar en inspector
     public NetPeer Server => server;
-
+    
     [Header("Configuración de conexión")]
-    public string ip = "10.244.234.196";
+    public string ip = "10.244.107.224";
     public int puerto = 9050;
     public string connectionKey = "game_key";
 

@@ -42,7 +42,7 @@ public class GameManager : MonoBehaviour
     {
         // Obtener todos los GameObjects de la escena
         GameObject[] todosLosObjetos = FindObjectsOfType<GameObject>();
-
+        GlobalData.Reset();
         foreach (GameObject obj in todosLosObjetos)
         {
             // No destruir objetos marcados como DontDestroyOnLoad

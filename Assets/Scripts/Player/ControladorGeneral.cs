@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections.Concurrent;
 using TMPro; // 👈 para usar TMP_Text
 using System.Collections;
+using System.Collections.Generic;
 
 public class ControladorGeneral : MonoBehaviour
 {
@@ -55,6 +56,10 @@ public class ControladorGeneral : MonoBehaviour
     [Header("Control de Hielo")]
     private bool debeCongelarseAlTocarSuelo = false;
     private bool estaCongelado = false;
+
+
+    [Header("Ignorar colisión con contenedores")]
+    [SerializeField] private List<Transform> contenedoresIgnorar = new List<Transform>();
 
     void Awake()
     {
@@ -124,7 +129,7 @@ public class ControladorGeneral : MonoBehaviour
 
         // Si está congelado, no procesar nada
         if (estaCongelado) return;
-        if (GlobalData.inicio == false) return;
+        if (GlobalData.inicio2 == false) return;
         ProcesarMovimientos();
         ProcesarVelocidad();
         //RevisarCheckpoint();
@@ -368,11 +373,23 @@ public class ControladorGeneral : MonoBehaviour
         // 🔹 RESETEAR rotación inmediatamente al chocar
 
         if (collision.gameObject.CompareTag("Ground")) return;
-        if (collision.transform.parent != null &&
-        collision.transform.parent.name.ToLower().Contains("road"))
+        foreach (Transform cont in contenedoresIgnorar)
         {
-            return; // Es hijo de Road, ignorar
+            if (cont != null && collision.transform.IsChildOf(cont))
+                return;
         }
+        // 🟦 DEBUG COMPLETO DE LA COLISIÓN
+        string nombre = collision.gameObject.name;
+        string padre = collision.transform.parent != null ? collision.transform.parent.name : "SIN PADRE";
+        Vector3 punto = collision.contacts[0].point;
+
+        Debug.Log($"⚠️ COLISIÓN DETECTADA\n" +
+                  $"Objeto: {nombre}\n" +
+                  $"Padre: {padre}\n" +
+                  $"Tag: {collision.gameObject.tag}\n" +
+                  $"Punto de contacto: {punto}");
+
+        // aquí sigue tu código..
         transform.rotation = Quaternion.identity;
         rb.angularVelocity = Vector3.zero; // Detener cualquier rotación angular
 

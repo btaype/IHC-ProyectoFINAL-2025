@@ -39,6 +39,7 @@ public class CountdownUI : MonoBehaviour
             Debug.Log("ENNNNNNTRRRRRRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
             yaSeMostro = true;
             MostrarCuentaRegresiva();
+            
         }
     }
 
@@ -92,6 +93,7 @@ public class CountdownUI : MonoBehaviour
         }
 
         StartCoroutine(ContadorCoroutine());
+       
     }
 
     private IEnumerator ContadorCoroutine()
@@ -107,5 +109,6 @@ public class CountdownUI : MonoBehaviour
 
         Destroy(panelPausa);
         panelPausa = null;
+        GlobalData.inicio2 = true;
     }
 }
